@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # encoding: utf-8
-from __future__ import print_function
+
 
 import re
 import subprocess
@@ -51,11 +51,12 @@ def find_spotify_input_sink():
                           stdout=subprocess.PIPE)
 
     out, err = p.communicate()
-    inputs = out.split('\n\n')
+    inputs = out.decode().split('\n\n')
 
     for inp in inputs:
         if "media.name = \"Spotify\"" in inp:
-            match = re.search('Sink Input \#(\d+)\n', inp)
+            match = re.search(r'Sink Input \#(\d+)\n', inp)
+
             return match.group(1)
 
     # spotify not found
@@ -76,7 +77,7 @@ def list_sinks():
     out, err = p.communicate()
     sinks = []
 
-    for sink in out.split('\n'):
+    for sink in out.decode().split('\n'):
         if sink:
             _, s, _ = sink.split('\t', 2)
             sinks.append(s)
@@ -102,9 +103,9 @@ def unload_combined_sink(combined_sink_id):
 def main():
     sinks = list_sinks()
     for i, s in enumerate(sinks):
-        print("%i: %s" % (i, s))
+        print(("%i: %s" % (i, s)))
 
-    sink_choose = raw_input("Choose your audio device (Default [0]): ")
+    sink_choose = input("Choose your audio device (Default [0]): ")
 
     # default sink
     if not sink_choose:
@@ -112,11 +113,11 @@ def main():
 
     rec_sink = sinks[sink_choose]
     spot_id = find_spotify_input_sink()
-    print("spotify id", spot_id)
+    print(("spotify id", spot_id))
     combined_sink = create_combined_sink(rec_sink)
-    print("create combined sink", combined_sink)
+    print(("create combined sink", combined_sink))
     move_sink_input(spot_id)
-    raw_input("Press key.")
+    input("Press key.")
     unload_combined_sink(combined_sink)
     print("unload combined sink.")
 

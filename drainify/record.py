@@ -1,6 +1,5 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # encoding: utf-8
-from __future__ import print_function
 
 import argparse
 import datetime
@@ -11,14 +10,14 @@ import signal
 import subprocess
 import sys
 import tempfile as tmp
-import urllib2
+import requests
 
 import dbus
 import dbus.mainloop.glib
 import eyed3
-import gobject
+import gi.repository.GLib as glib
 
-import pa
+from . import pa
 
 # url prefix for album covers
 IMG_PREFIX = "https://d3rt1990lpmkn.cloudfront.net/320/"
@@ -48,9 +47,9 @@ def set_id3_tags(filename, metadata):
     cover_art_url = metadata['mpris:artUrl']
     _, cover_id = cover_art_url.rsplit('/', 1)
     art_url = IMG_PREFIX + cover_id
-    image_data = urllib2.urlopen(art_url).read()
+    image_data = requests.get(art_url).content
 
-    audiofile.tag.images.set(3, image_data, "image/jpeg", u"")
+    audiofile.tag.images.set(3, image_data, "image/jpeg", "")
 
     audiofile.tag.save()
 
@@ -77,16 +76,16 @@ class Recorder(object):
         self.finished_ts = time.time() + length / 1E6
 
         # handler that stops recording of track
-        self.timeout_handler = gobject.timeout_add(int(milli_secs),
+        self.timeout_handler = glib.timeout_add(int(milli_secs),
                                                    self.stop_recording_cb)
 
     def stop_handler(self):
         """ Killing running recorders immediately """
-        print("%d/%d  %s  stop_handler"%(self.recorder.pid,self.encoder.pid,self.metadata['Metadata']['xesam:title']))
-        print("should stop at %f, now its %f"%(self.finished_ts, time.time()))
+        print(("%d/%d  %s  stop_handler"%(self.recorder.pid,self.encoder.pid,self.metadata['Metadata']['xesam:title'])))
+        print(("should stop at %f, now its %f"%(self.finished_ts, time.time())))
 
         # remove timeout handler
-        gobject.source_remove(self.timeout_handler)
+        glib.source_remove(self.timeout_handler)
 
         if time.time() + 5 >= self.finished_ts:
             print("close enough, calling regular stop")
@@ -101,7 +100,7 @@ class Recorder(object):
             os.remove(self.tmp_name)
 
     def debugout(self, s):
-        print("%d/%d  %s  %s"%(self.recorder.pid,self.encoder.pid,self.metadata['Metadata']['xesam:title'], s))
+        print(("%d/%d  %s  %s"%(self.recorder.pid,self.encoder.pid,self.metadata['Metadata']['xesam:title'], s)))
 
     def stop_recording_cb(self):
         """ Callback for stopping the recording.
@@ -130,17 +129,17 @@ class Recorder(object):
         # moving temp recording to destination then finished
         shutil.move(self.tmp_name, final_name)
 
-        print("finished recording of %s - %s." % (artist, title))
+        print(("finished recording of %s - %s." % (artist, title)))
 
 
 # TODO: skipping tracks dont work
 def recording_handler(sender=None, metadata=None, sig=None):
-    print("handler",metadata)
+    print(("handler",metadata))
     if "PlaybackStatus" in metadata:
         if metadata['PlaybackStatus'] == 'Paused':
             # dont stop befor last song recording ended
             time.sleep(1.5)
-            for pid, rec in running_recs.items():
+            for pid, rec in list(running_recs.items()):
                 rec.stop_handler()
             return
         if metadata['PlaybackStatus'] == 'Stopped':
@@ -151,7 +150,7 @@ def recording_handler(sender=None, metadata=None, sig=None):
                 return
             else:
                 # message contains metadata and PlaybackStatus means track skipping
-                for pid, rec in running_recs.items():
+                for pid, rec in list(running_recs.items()):
                     if rec.metadata['Metadata']['mpris:trackid'] == metadata['Metadata']['mpris:trackid']:
                         return
                     rec.stop_handler()
@@ -159,7 +158,7 @@ def recording_handler(sender=None, metadata=None, sig=None):
     title = metadata['Metadata']['xesam:title']
     artist = metadata['Metadata']['xesam:artist'][0]
     tmp_file = tmp.mktemp(suffix='.mp3')
-    print("recording: %s - %s" % (artist, title))
+    print(("recording: %s - %s" % (artist, title)))
 
     # not record the end of the last song, so sleep
     #time.sleep(1.0)
@@ -182,7 +181,7 @@ def recording_handler(sender=None, metadata=None, sig=None):
                              '--signed',
                              '--little-endian',
                              #'-b', '320', # bitrate
-                             '-V', '2',  # quality
+                             '-V', '3',  # quality
                              #'--abr', '320',
                              '--quiet',  # silent output
                              '-s', '44.1',
@@ -195,7 +194,7 @@ def recording_handler(sender=None, metadata=None, sig=None):
 
 
 def debug_handler(sender=None, metadata=None, k2=None):
-    print(datetime.datetime.now(), "got signal from ", sender)
+    print((datetime.datetime.now(), "got signal from ", sender))
     print(metadata.keys())
     print(k2)
     print("")
@@ -203,7 +202,7 @@ def debug_handler(sender=None, metadata=None, k2=None):
 
 def cleanup():
     """Kill all running recordings."""
-    for pid, rec in running_recs.items():
+    for pid, rec in list(running_recs.items()):
         rec.stop_handler()
 
     print("Stop recording.")
@@ -220,7 +219,7 @@ def main():
     args = parser.parse_args()
     if args.dir:
         if not os.path.exists(args.dir):
-            create_dir = raw_input("Directory doesn't exists. Create? [y/n] ")
+            create_dir = input("Directory doesn't exists. Create? [y/n] ")
             if create_dir == 'y':
                 os.mkdir(args.dir)
             else:
@@ -267,7 +266,7 @@ def main():
     change_manager.connect_to_signal("PropertiesChanged",
                                      recording_handler)
 
-    loop = gobject.MainLoop()
+    loop = glib.MainLoop()
 
     try:
         print("Start recording on next track.")

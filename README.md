@@ -1,5 +1,7 @@
 ## *drainify* - Record your spotify stream from pulseaudio.
 
+WARNING: This project is a complete and utter mess. 
+
 ### Dependencies
  * pulseaudio
  * pulseaudio-utils (command line tools)
